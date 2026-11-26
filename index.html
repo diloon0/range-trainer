@@ -1,0 +1,830 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Range Trainer</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Ranges">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0f1512">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+body{margin:0}
+input{font:500 .9rem var(--body);padding:9px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--fg);width:100%}
+/* Layout: one column app shell, top tabs, felt table as the hero of the Train view; story text lives under the table. */
+:root{
+  --bg:#eef1ee; --panel:#ffffff; --fg:#17201b; --muted:#5c6a62; --line:#d3dbd5;
+  --felt:#155a43; --felt-edge:#0b3b2b; --rail:#3b2a1d; --brass:#c99a3b;
+  --raise:#c8433a; --call:#2f8a57; --fold:#8a96a3; --foldbg:#e4e8ec;
+  --good:#2f8a57; --bad:#c8433a; --claude:#6a5acd; --hatch:#000000cc;
+  --display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body:"Inter", system-ui, -apple-system, sans-serif;
+  --mono:"JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f1512; --panel:#18211c; --fg:#e6ece8; --muted:#97a69d; --line:#2b3831;
+  --felt:#13513c; --felt-edge:#08281d; --rail:#2a1e15; --brass:#d8ad55;
+  --raise:#e0605a; --call:#45a870; --fold:#7d8a96; --foldbg:#25302b; --good:#45a870; --bad:#e0605a; --claude:#9d90f0; --hatch:#ffffffa8; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1512; --panel:#18211c; --fg:#e6ece8; --muted:#97a69d; --line:#2b3831;
+  --felt:#13513c; --felt-edge:#08281d; --rail:#2a1e15; --brass:#d8ad55;
+  --raise:#e0605a; --call:#45a870; --fold:#7d8a96; --foldbg:#25302b; --good:#45a870; --bad:#e0605a; --claude:#9d90f0; --hatch:#ffffffa8; color-scheme:dark}
+html,body{background:var(--bg);color:var(--fg)}
+body{font-family:var(--body);font-size:15px;line-height:1.45;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px 16px}
+.wrap{max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+header{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+h1{font-family:var(--display);font-weight:800;font-size:1.6rem;margin:0;letter-spacing:-.01em}
+h2{font-family:var(--display);font-weight:600;font-size:1.15rem;margin:0}
+.note{font-size:.8rem;color:var(--muted)}
+.tabs{display:flex;gap:4px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:4px}
+.tabs button{flex:1;border:0;background:transparent;color:var(--fg);font:600 .95rem var(--body);padding:9px 6px;border-radius:7px;cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--felt);color:#fff}
+button:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid var(--brass);outline-offset:2px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.settings{display:grid;grid-template-columns:auto 1fr;gap:8px 10px;align-items:center}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--panel);justify-self:start;max-width:100%}
+.seg button{border:0;background:transparent;color:var(--fg);font:500 .82rem var(--body);padding:7px 10px;cursor:pointer;white-space:nowrap}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
+.lbl{font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+select{font:500 .9rem var(--body);padding:7px 8px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--fg)}
+details.opts{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 12px}
+details.opts summary{cursor:pointer;font-weight:600;font-size:.9rem}
+details.opts[open] summary{margin-bottom:10px}
+
+/* Table */
+.table{position:relative;width:100%;max-width:100%;flex:1 1 auto;min-height:calc(min(100vw - 32px, 640px) * 1.02)}
+#v-train{min-height:calc(100dvh - 28px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px))}
+.felt{position:absolute;inset:9% 11% 9% 11%;border-radius:50%/42%;background:radial-gradient(ellipse at 50% 45%, #1c7556 0%, var(--felt) 55%, var(--felt-edge) 100%);box-shadow:0 0 0 9px var(--rail),inset 0 0 40px #0006}
+.pot{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font:500 .8rem var(--mono);color:#f3e3bd;text-align:center;white-space:nowrap}
+.seat{position:absolute;transform:translate(-50%,-50%);width:60px;transition:opacity .3s}
+.seat .pod{background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:3px 2px 4px;text-align:center;box-shadow:0 2px 6px #0002}
+.seat .pos{font:700 .72rem var(--body);line-height:1.2}
+.seat .tag{display:inline-block;font:600 .6rem var(--body);padding:0 4px;border-radius:4px;margin-top:1px}
+.tag.Rec{background:#f2d98a;color:#4a3a05}.tag.Agg{background:#f0a49c;color:#5a120c}.tag.Pass{background:#a9cdea;color:#0c3352}
+.seat.folded{opacity:.3}
+.seat.acting .pod{border-color:var(--brass);box-shadow:0 0 0 3px var(--brass)}
+.seat.hero{width:84px}
+.seat.hero .pod{background:var(--brass);color:#22180c;border-color:var(--brass);padding:5px 4px}
+.seat.hero .pos{font-size:.85rem}
+.seat.hero.intro .pod{animation:pulse 1s ease-in-out infinite alternate}
+@keyframes pulse{from{box-shadow:0 0 0 0 var(--brass)}to{box-shadow:0 0 0 8px transparent}}
+.chip{position:absolute;transform:translate(-50%,-50%);font:600 .66rem var(--body);border-radius:999px;padding:2px 7px;white-space:nowrap;color:#fff;box-shadow:0 1px 3px #0005}
+.chip.blind{background:#f3e3bd;color:#3b2a1d;font-family:var(--mono);font-weight:500}
+.chip.limp,.chip.call{background:var(--call)}.chip.raise{background:var(--raise)}
+.dealer{position:absolute;transform:translate(-50%,-50%);width:18px;height:18px;border-radius:50%;background:#fff;color:#111;font:800 .6rem var(--body);display:grid;place-items:center;box-shadow:0 1px 3px #0005}
+.story{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 12px;min-height:2.9em;display:flex;align-items:center;justify-content:center;text-align:center;font-weight:600}
+
+.hand{display:flex;justify-content:center;gap:10px}
+.card{width:60px;height:84px;border-radius:9px;background:#fdfcf8;border:1px solid #cfcab9;box-shadow:0 3px 8px #0003;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:var(--display);color:#1b1b1b;line-height:1}
+.card .r{font-size:1.9rem;font-weight:800}.card .s{font-size:1.4rem}
+.card.red{color:#c3262b}
+.answers{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.answers button{font:700 1rem var(--body);padding:14px 4px;border-radius:10px;border:0;color:#fff;cursor:pointer}
+.answers button:disabled{opacity:.3;cursor:default}
+.b-F{background:var(--fold)}.b-C{background:var(--call)}.b-R{background:var(--raise)}
+[hidden]{display:none!important}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.kpi .v{font:800 1.5rem var(--display);font-variant-numeric:tabular-nums}
+.kpi .k{font-size:.72rem;color:var(--muted)}
+.days{display:flex;align-items:flex-end;gap:4px;height:96px;margin-top:6px;border-bottom:1px solid var(--line)}
+.day{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;min-width:0}
+.day .bar{width:100%;border-radius:3px 3px 0 0;background:var(--felt)}
+.day .dl{font:500 .58rem var(--mono);color:var(--muted);white-space:nowrap}
+.sit{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.sit summary{cursor:pointer;display:flex;justify-content:space-between;gap:8px;align-items:center;list-style:none}
+.sit summary::-webkit-details-marker{display:none}
+.sit .nm{font-weight:600;font-size:.9rem}
+.pill{font:600 .78rem var(--mono);padding:3px 8px;border-radius:999px;white-space:nowrap;color:#fff}
+.grid .cell.e-bad,.sw.e-bad{background-image:repeating-linear-gradient(45deg,var(--hatch) 0 1.5px,transparent 1.5px 4.5px);text-shadow:0 0 2px var(--bg),0 0 3px var(--bg),0 0 5px var(--bg),0 0 1px var(--bg)}
+.grid .cell.e-mid,.sw.e-mid{background-image:repeating-linear-gradient(45deg,var(--hatch) 0 1px,transparent 1px 7px);text-shadow:0 0 2px var(--bg),0 0 3px var(--bg),0 0 5px var(--bg),0 0 1px var(--bg)}
+.e-new{outline:1.5px dashed var(--fg);outline-offset:-2px}
+.sw.ekey{background-color:var(--call);width:16px;height:16px}
+.h-good{background:var(--good)}.h-mid{background:#c9902b}.h-bad{background:var(--bad)}.h-none{background:var(--foldbg);color:var(--muted)}
+.sit .body{display:flex;flex-direction:column;gap:10px;margin-top:10px}
+.heat .cell{color:#fff;cursor:default}
+.heat .cell.h-none{color:var(--muted)}
+.edges{display:flex;flex-direction:column;gap:4px;font-size:.84rem}
+.edges div{display:flex;justify-content:space-between;gap:8px}
+.feedback{position:absolute;inset:0 0 auto 0;min-height:100%;box-sizing:border-box;z-index:5;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:10px;display:flex;flex-direction:column;gap:8px;box-shadow:0 8px 28px #0005}
+.fbhead{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+#explain{font-size:.88rem}
+.post{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.post.three{grid-template-columns:1fr 1fr 1fr}
+.post button{font:700 .95rem var(--body);padding:14px 4px;border-radius:10px;cursor:pointer}
+.post .ghost{font-weight:700}
+.post.ok,.post.no{padding:6px;border-radius:13px;animation:flash .5s ease-out}
+.post.ok{background:color-mix(in srgb,var(--good) 30%,transparent);box-shadow:0 0 0 2px var(--good)}
+.post.no{background:color-mix(in srgb,var(--bad) 30%,transparent);box-shadow:0 0 0 2px var(--bad)}
+.feedback.ok{border-color:var(--good);border-width:2px}.feedback.no{border-color:var(--bad);border-width:2px}
+@keyframes flash{from{transform:scale(1.04)}to{transform:none}}
+.sitlist{grid-column:1/-1;display:flex;flex-direction:column;gap:4px;max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:8px}
+.sitlist label{display:flex;gap:8px;align-items:center;font-size:.85rem}
+.fbtools{display:flex;gap:8px;margin-left:auto}
+.verdict{font:800 1.2rem var(--display)}
+.verdict.ok{color:var(--good)}.verdict.no{color:var(--bad)}
+.primary{font:700 1rem var(--body);padding:12px;border-radius:10px;border:0;background:var(--fg);color:var(--bg);cursor:pointer}
+.ghost{font:600 .85rem var(--body);padding:8px 12px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--fg);cursor:pointer}
+.ghost:disabled{opacity:.4;cursor:default}
+.score{font:500 .85rem var(--mono);color:var(--muted)}
+.src{display:inline-block;font:700 .62rem var(--body);letter-spacing:.06em;text-transform:uppercase;padding:2px 6px;border-radius:5px;vertical-align:1px}
+.src.custom{background:var(--fg);color:var(--bg)}
+.src.claude{background:var(--claude);color:#fff}
+
+/* Grid */
+.gridwrap{overflow-x:auto}
+.grid{display:grid;grid-template-columns:repeat(13,1fr);gap:2px;touch-action:none;user-select:none;-webkit-user-select:none;min-width:300px}
+.cell{aspect-ratio:1;display:grid;place-items:center;font:500 clamp(.5rem,2.1vw,.72rem) var(--mono);border-radius:3px;color:#fff;cursor:pointer}
+.cell.F{background:var(--foldbg);color:var(--muted)}
+.cell.R{background:var(--raise)}.cell.C{background:var(--call)}
+.cell.hl{outline:3px solid var(--brass);outline-offset:-1px;position:relative;z-index:1}
+.mini .cell{cursor:default}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:.82rem;color:var(--muted)}
+.sw{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-2px;margin-right:4px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips button{font:500 .78rem var(--body);padding:5px 9px;border-radius:999px;border:1px dashed var(--line);background:transparent;color:var(--fg);cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+.chips button.has{border-style:solid;background:var(--panel)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:12px}
+textarea{width:100%;box-sizing:border-box;min-height:110px;font:500 .72rem var(--mono);border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--fg);padding:8px}
+.mock{font-size:.8rem;background:#f3e3bd;color:#3b2a1d;border-radius:8px;padding:8px 10px}
+.grid .cell.R,.grid .cell.C{text-shadow:0 0 1px #000c,0 0 3px #000b,0 0 6px #0009,0 1px 2px #000a}
+@media (prefers-reduced-motion: reduce){.seat{transition:none}.seat.hero.intro .pod{animation:none}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>Range Trainer</h1>
+    <span class="note" id="syncpill"></span>
+  </header>
+  <div class="tabs" role="tablist">
+    <button role="tab" id="tab-train" aria-selected="true">Train</button>
+    <button role="tab" id="tab-progress" aria-selected="false">Progress</button>
+    <button role="tab" id="tab-ranges" aria-selected="false">Ranges</button>
+    <button role="tab" id="tab-sync" aria-selected="false">Sync</button>
+  </div>
+
+  <!-- TRAIN -->
+  <section id="v-train" style="display:flex;flex-direction:column;gap:12px">
+    <details class="opts" id="opts">
+      <summary>Settings</summary>
+      <div class="settings">
+        <span class="lbl">Deal</span>
+        <div class="seg" id="mode">
+          <button data-v="hot" aria-pressed="true">Hot</button>
+          <button data-v="warm" aria-pressed="false">Warm</button>
+          <button data-v="cold" aria-pressed="false">Cold</button>
+          <button data-v="weak" aria-pressed="false">Weak spots</button>
+        </div>
+        <span class="lbl">Speed</span>
+        <div class="seg" id="speed">
+          <button data-v="slow" aria-pressed="false">Slow</button>
+          <button data-v="normal" aria-pressed="true">Normal</button>
+          <button data-v="fast" aria-pressed="false">Fast</button>
+        </div>
+        <span class="lbl">After</span>
+        <div class="seg" id="after">
+          <button data-v="stop" aria-pressed="true">Stop</button>
+          <button data-v="right" aria-pressed="false">Next if right</button>
+          <button data-v="always" aria-pressed="false">Always next</button>
+        </div>
+        <span class="lbl">Ranges</span>
+        <div class="seg" id="which">
+          <button data-v="all" aria-pressed="true">All</button>
+          <button data-v="custom" aria-pressed="false">Custom</button>
+          <button data-v="claude" aria-pressed="false">Claude</button>
+        </div>
+        <span class="lbl">Situations</span>
+        <div class="row"><button class="ghost" id="sitbtn">Choose</button><span class="note" id="sitsum"></span></div>
+        <div class="sitlist" id="sitlist" hidden></div>
+      </div>
+      <div class="note" id="modehelp" style="margin-top:8px"></div>
+    </details>
+    <div class="table" id="table">
+      <div class="felt"></div>
+      <div class="pot" id="pot"></div>
+      <div class="feedback" id="feedback" hidden>
+        <div class="fbhead"><div class="verdict" id="verdict"></div><div class="fbtools"><button class="ghost" id="editthis">Edit this range</button></div><div id="explain" style="flex-basis:100%"></div></div>
+        <div class="grid mini" id="minigrid"></div>
+      </div>
+    </div>
+    <div class="story" id="log" aria-live="polite"></div>
+    <div class="hand" id="hand"></div>
+    <div class="answers" id="answers">
+      <button class="b-F" data-a="F" disabled>Fold</button>
+      <button class="b-C" data-a="C" disabled>Call</button>
+      <button class="b-R" data-a="R" disabled>Raise</button>
+    </div>
+    <div class="post" id="post" hidden>
+      <button class="ghost" id="toggle">Hide range</button>
+      <button class="ghost" id="stay" hidden>Stay here</button>
+      <button class="primary" id="next">Next hand</button>
+    </div>
+    <div class="row" style="justify-content:space-between">
+      <span class="score" id="score"></span>
+      <button class="ghost" id="skip">Skip to my turn</button>
+    </div>
+  </section>
+
+  <!-- RANGES -->
+  <section id="v-ranges" hidden style="flex-direction:column;gap:12px">
+    <div class="panel">
+      <div class="row">
+        <select id="s-game" aria-label="Game type"><option value="cash">Cash</option><option value="tourney">Tournament</option></select>
+        <select id="s-seat" aria-label="Your seat"></select>
+        <select id="s-action" aria-label="What happened before you"></select>
+        <select id="s-vill" aria-label="Villain type"></select>
+      </div>
+      <div class="row" id="srcrow"></div>
+      <div class="row" style="justify-content:space-between">
+        <div class="row"><span class="lbl">Paint</span>
+          <div class="seg" id="paint">
+            <button data-v="R" aria-pressed="true">Raise</button>
+            <button data-v="C" aria-pressed="false">Call</button>
+            <button data-v="F" aria-pressed="false">Fold</button>
+          </div></div>
+        <div class="row">
+          <button class="ghost" id="undo" disabled>Undo</button>
+          <button class="ghost" id="clear">Clear</button>
+        </div>
+      </div>
+      <div class="gridwrap"><div class="grid" id="editgrid"></div></div>
+      <div class="legend" id="pct"></div>
+      <div class="note">Tap or drag across squares to paint them. Top-right is suited, bottom-left is offsuit, the diagonal is pairs. Every square saves on this device the moment you paint it.</div>
+    </div>
+    <div class="panel">
+      <h2>Needs a range</h2>
+      <div class="note" id="needcount"></div>
+      <div class="chips" id="need"></div>
+      <h2>Ready to train</h2>
+      <div class="chips" id="have"></div>
+    </div>
+    <button class="ghost" id="reset">Reset all ranges to the starting set</button>
+  </section>
+
+  <!-- PROGRESS -->
+  <section id="v-progress" hidden style="flex-direction:column;gap:12px">
+    <div class="panel">
+      <div class="kpis" id="kpis"></div>
+      <div><span class="lbl">Accuracy by day</span><div class="days" id="days"></div></div>
+      <div class="note">"Recent" counts only your last answers, so old mistakes fade out. When you repaint part of a range, the edges on that line start fresh. Every answer you've ever given is kept, and the daily chart and all-time numbers use all of them.</div>
+    </div>
+    <div class="row" style="justify-content:space-between"><h2>Situations</h2><span class="note">Weakest first</span></div>
+    <div id="sits" style="display:flex;flex-direction:column;gap:8px"></div>
+  </section>
+
+  <!-- SYNC -->
+  <section id="v-sync" hidden style="flex-direction:column;gap:12px">
+    <div class="panel">
+      <h2>Google Sheet sync</h2>
+      <div class="note" id="syncstatus">Not set up yet.</div>
+      <label class="lbl" for="syncurl">Your Sheet's web app link</label>
+      <input id="syncurl" type="url" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://script.google.com/macros/s/.../exec">
+      <div class="row"><button class="ghost" id="syncsave">Save link</button><button class="ghost" id="syncnow">Sync now</button></div>
+      <div class="note">Everything saves on this device the moment you do it. Changes are sent to your Sheet about 30 seconds after you stop, and whenever you leave the app. Opening the app pulls in changes from your other devices. Offline is fine: changes wait until you're back online.</div>
+    </div>
+    <div class="panel">
+      <h2>Backup code</h2>
+      <div class="note">Copy this code to move your ranges by hand, for example by AirDropping it to your iPad. Paste a code below to load it.</div>
+      <textarea id="exp" readonly></textarea>
+      <div class="row"><button class="ghost" id="copy">Copy code</button><span class="note" id="copied"></span></div>
+      <textarea id="imp" placeholder="Paste a backup code here"></textarea>
+      <div class="row"><button class="ghost" id="load">Load code</button><span class="note" id="loaded"></span></div>
+    </div>
+  </section>
+</div>
+
+<script>
+const BASE = {"cash|EP|Limp|Rec": {"g": "RRRRRFFFFFFFFRRRRRFFFFFFFFRFRRRFFFFFFFFFFFRRFFFFFFFFFFFFRFFFFFFFFFFFFFRFFFFFFFFFFFFFRFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", "src": "custom"}, "cash|BTN|Limp|Rec": {"g": "RRRRRRRRRRRRRRRRRRRFFFFFFFRRRRRRFFFFFFFRFFRRRFFFFFFFRFFFRRFFFFFFFFFFFFRFFFFFFFFFFFFFRFFFFFFFFFFFFFRFFFFFFFFFFFFFRFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", "src": "custom"}, "cash|HJ|Open|Rec": {"g": "RRRRRFFFFFFFFRRRRFFFFFFFFFRFRRFFFFFFFFFFFFRFFFFFFFFFFFFFRFFFFFFFFFFFFFRFFFFFFFFFFFFFRFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", "src": "custom"}, "cash|EP|Open|Rec": {"g": "RRRRRFFFFFFFFRRRRFFFFFFFFFRFRRFFFFFFFFFFFFRFFFFFFFFFFFFFRFFFFFFFFFFFFFRFFFFFFFFFFFFFRFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", "src": "custom"}, "cash|BTN|Open|Rec": {"g": "RRRRRRRRRRRRRRRRRRRFFFFFFFRRRRRRFFFFFFFRFFRRFFFFFFFFRFFFRFFFFFFFFFFFFFRFFFFFFFFFFFFFRFFFFFFFFFFFFFRFFFFFFFFFFFFFRFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", "src": "custom"}, "cash|BTN|Open|Agg": {"g": "RRRRRRRRRRFFFRRRRRRFFFFFFFRRRRRFFFFFFFFRFFRRRFFFFFFFRFFFRRFFFFFFFFFFFFRFFFFFFFFFFFFFRFFFFFFFFFFFFFRFFFFFFFFFFFFFRFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", "src": "custom"}, "cash|BTN|Open|Pass": {"g": "CCCCCFFFFFFFFFCCCCFFFFFFFFFFCCFFFFFFFFFFFFCCFFFFFFFFFFFFCCFFFFFFFFFFFFCFFFFFFFFFFFFFCFFFFFFFFFFFFFCFFFFFFFFFFFFFCFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", "src": "custom"}, "cash|BTN|OpenCC|Rec": {"g": "RRRRRRCCCCCCCRRRRRCCFFFFFFRRRRCCFFFFFFFCCFRRCFFFFFFFFFFFRCFFFFFFFFFFFFRCFFFFFFFFFFFFRCFFFFFFFFFFFFRCFFFFFFFFFFFFCCFFFFFFFFFFFFCFFFFFFFFFFFFFCFFFFFFFFFFFFFCFFFFFFFFFFFFFC", "src": "custom"}, "cash|EP|ThreeBet|Pass": {"g": "RRRCFFFFFFFFFRRCFFFFFFFFFFFFRCFFFFFFFFFFFFRCFFFFFFFFFFFFCFFFFFFFFFFFFFCFFFFFFFFFFFFFCFFFFFFFFFFFFFCFFFFFFFFFFFFFCFFFFFFFFFFFFFCCFFFFFFFFFFFFCCFFFFFFFFFFFFCFFFFFFFFFFFFFC", "src": "custom"}, "cash|EP|Fold|Rec": {"g": "RRRRRRFFFFFFFRRRRRRFFFFFFFRFRRRRFFFFFFFFFFRRRFFFFFFFFFFFRRFFFFFFFFFFFFRRFFFFFFFFFFFFRRFFFFFFFFFFFFRRFFFFFFFFFFFFRRFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", "src": "custom"}, "cash|HJ|Fold|Rec": {"g": "RRRRRRRRRRRRRRRRRRRFFFFFFFRRRRRRFFFFFFFRRRRRRFFFFFFFRFFFRRFFFFFFFFFFFFRRFFFFFFFFFFFFRRFFFFFFFFFFFFRRFFFFFFFFFFFFRFFFFFFFFFFFFFRFFFFFFFFFFFFFRFFFFFFFFFFFFFRFFFFFFFFFFFFFR", "src": "claude"}, "cash|BTN|Fold|Rec": {"g": "RRRRRRRRRRRRRRRRRRRRRRRFFFRRRRRRRRFFFFFRRRRRRRRFFFFFRRRRRRRRFFFFFRRRRRRRRRFFFFRFFFFFRRRFFFFRFFFFFFRRRFFFFFFFFFFFRRFFFRFFFFFFFFRRFFFFFFFFFFFFRFFFFFFFFFFFFFRFFFFFFFFFFFFFR", "src": "claude"}, "cash|SB|Fold|Rec": {"g": "RRRRRRRRRRRRRRRRRRRRFFFFFFRRRRRRFFFFFFFRRRRRRFFFFFFFRRRRRRFFFFFFFRFFFFRRFFFFFFRFFFFFRRFFFFFFFFFFFFRFFFFFFFFFFFFFRFFFFFFFFFFFFFRFFFFFFFFFFFFFRFFFFFFFFFFFFFRFFFFFFFFFFFFFR", "src": "claude"}, "cash|HJ|Limp|Rec": {"g": "RRRRRCCCCCCCCRRRRRCFFFFFFFRRRRCFFFFFFFFRFFRCFFFFFFFFFFFFRCFFFFFFFFFFFFRCFFFFFFFFFFFFRCFFFFFFFFFFFFRCFFFFFFFFFFFFCCFFFFFFFFFFFFCFFFFFFFFFFFFFCFFFFFFFFFFFFFCFFFFFFFFFFFFFC", "src": "claude"}, "cash|SB|Limp|Rec": {"g": "RRRRCCCCCCCCCRRRCCCCFFFFFFRCRCCCFFFFFFFCCCRCCFFFFFFFCCCCRCCFFFFFFCCCCCRCCFFFFFCFFFFFCCCFFFFCFFFFFFCCCFFFCFFFFFFFCCCFFCFFFFFFFFCCFFCFFFFFFFFFCFFCFFFFFFFFFFCFCFFFFFFFFFFFC", "src": "claude"}, "cash|BB|Limp|Rec": {"g": "RRRRRCCCCCCCCRRRRCCCCCCCCCRRRCCCCCCCCCCRCCRCCCCCCCCCCCCCRCCCCCCCCCCCCCRCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC", "src": "claude"}, "cash|SB|Open|Rec": {"g": "RRRCCFFFFFFFFRRCCFFFFFFFFFCFRCFFFFFFFFFFFFRCFFFFFFFFFFFFRCFFFFFFFFFFFFCCFFFFFFFFFFFFCFFFFFFFFFFFFFCFFFFFFFFFFFFFCFFFFFFFFFFFFFCFFFFFFFFFFFFFCFFFFFFFFFFFFFCFFFFFFFFFFFFFC", "src": "claude"}, "cash|BB|Open|Rec": {"g": "RRRCCCCCCCCCCRRCCCCCCFFFFFCCRCCCCFFFFFFCCCCCCCFFFFFFCCCCCCCFFFFFFCFFFFCCCFFFFFFFFFFFCCCFFFFFFFFFFFCCCFFFFFFFFFFFCCCFFFFFFFFFFFCCFFFFFFFFFFFFCFFFFFFFFFFFFFCFFFFFFFFFFFFFC", "src": "claude"}, "cash|BB|OpenCC|Rec": {"g": "RRCCCCCCCCCCCRRCCCCCFFFFFFCCRCCCFFFFFFFCCCCCCFFFFFFFCFFFCCCFFFFFFFFFFFCCCFFFFFFFFFFFCCCFFFFFFFFFFFCCFFFFFFFFFFFFCCFFFFFFFFFFFFCCFFFFFFFFFFFFCFFFFFFFFFFFFFCFFFFFFFFFFFFFC", "src": "claude"}, "cash|HJ|ThreeBet|Rec": {"g": "RRCCFFFFFFFFFRRCCFFFFFFFFFCFRCFFFFFFFFFFFFCCFFFFFFFFFFFFCCFFFFFFFFFFFFCFFFFFFFFFFFFFCFFFFFFFFFFFFFCFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", "src": "claude"}, "cash|BTN|ThreeBet|Rec": {"g": "RRCCCFFFFCFFFRRCCCFFFFFFFFCCRCCFFFFFFFFCFFCCFFFFFFFFFFFFCCFFFFFFFFFFFFCCFFFFFFFFFFFFCCFFFFFFFFFFFFCFFFFFFFFFFFFFCFFFFFFFFFFFFFCFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", "src": "claude"}};
+const RANKS = "AKQJT98765432";
+const SEATS = ["UTG","UTG+1","MP","LJ","HJ","CO","BTN","SB","BB"];
+const GROUPS = {EP:[0,1,2], HJ:[3,4], BTN:[5,6], SB:[7], BB:[8]};
+const GROUP_OF = s=>Object.keys(GROUPS).find(g=>GROUPS[g].includes(s));
+const ACTIONS = {Fold:"Folded to you", Limp:"Limper", Open:"Raise", OpenCC:"Raise + caller", ThreeBet:"3-bet after you raise"};
+const VILLS = ["Rec","Agg","Pass"];
+const NEED = {Fold:0, Limp:1, Open:1, OpenCC:2, ThreeBet:0};
+const NAMES = {R:"Raise",C:"Call",F:"Fold"};
+/* time per move in ms: [intro beat, important move]; a fold takes a third of an important move */
+const SPEEDS = {slow:[4000,3600], normal:[3000,2400], fast:[2000,1500]};
+const MODEHELP = {weak:"Weak spots: deals next to the edges you've been missing lately, and edges you haven't seen yet.", hot:"Hot: only hands right on the border of your range.", warm:"Warm: hands within two squares of a border.", cold:"Cold: real random deals, like at the table."};
+function labels(act, seat){
+  const L={Fold:{F:"Fold",C:"Limp",R:"Raise"}, Limp:{F:"Fold",C:"Limp behind",R:"Raise"},
+    Open:{F:"Fold",C:"Call",R:"3-bet"}, OpenCC:{F:"Fold",C:"Call",R:"3-bet"}, ThreeBet:{F:"Fold",C:"Call",R:"4-bet"}}[act];
+  if(act==="Limp" && seat==="BB") return {F:"Fold",C:"Check",R:"Raise"};
+  if(act==="Limp" && seat==="SB") return {F:"Fold",C:"Complete",R:"Raise"};
+  return L;
+}
+
+const store = {
+  get(k,d){try{const v=localStorage.getItem("rt-"+k);return v?JSON.parse(v):d}catch(e){return d}},
+  set(k,v){try{localStorage.setItem("rt-"+k,JSON.stringify(v))}catch(e){}}
+};
+const clone = o=>JSON.parse(JSON.stringify(o));
+let ranges = store.get("ranges2", null);
+if(!ranges){
+  ranges = clone(BASE);
+  const old = store.get("ranges", null); /* edits made in mockup v1 */
+  if(old) for(const [k,g] of Object.entries(old)) if(typeof g==="string" && (!BASE[k] || BASE[k].g!==g)) ranges[k]={g,src:"custom"};
+}
+let stats = store.get("stats", {right:0,total:0,streak:0});
+let log = store.get("log", []); /* every answer, kept for the learning tracker */
+const newId = ()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+log.forEach(e=>{ if(!e.id) e.id=newId(); });
+let prefs = Object.assign({mode:"hot",speed:"normal",after:"stop",which:"all",only:[]}, store.get("prefs",{}));
+const save = ()=>store.set("ranges2",ranges);
+
+const $ = s=>document.querySelector(s);
+const rnd = n=>Math.floor(Math.random()*n);
+const pick = a=>a[rnd(a.length)];
+function handName(i,j){ if(i===j) return RANKS[i]+RANKS[j]; return i<j? RANKS[i]+RANKS[j]+"s" : RANKS[j]+RANKS[i]+"o"; }
+function keyLabel(k){const [g,seat,act,v]=k.split("|");return `${g==="cash"?"Cash":"Tourney"} · ${seat} · ${ACTIONS[act]}${act==="Fold"?"":" by "+v}`}
+function srcBadge(src){return `<span class="src ${src}">${src==="claude"?"Claude":"Custom"}</span>`}
+function combos(i,j){return i===j?6:(i<j?4:12)}
+function hasRange(e){return !!e && !!e.g && /[RC]/.test(e.g)}
+function validKey(seat,act){ return !(seat==="BB" && (act==="Fold"||act==="ThreeBet")); }
+
+/* ---------- tabs ---------- */
+const views={train:$("#v-train"),progress:$("#v-progress"),ranges:$("#v-ranges"),sync:$("#v-sync")};
+function show(name){
+  for(const [n,el] of Object.entries(views)){el.hidden = n!==name; el.style.display = n===name?"flex":"none"; $("#tab-"+n).setAttribute("aria-selected", n===name);}
+  if(name!=="train") stopCountdown();
+  if(name==="ranges") drawEditor();
+  if(name==="progress") drawProgress();
+  if(name==="sync") $("#exp").value = btoa(unescape(encodeURIComponent(JSON.stringify({v:2,ranges}))));
+}
+for(const n of Object.keys(views)) $("#tab-"+n).onclick=()=>show(n);
+
+function segment(id, initial, cb){
+  const el=$(id);
+  const set=v=>el.querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed",x.dataset.v===v));
+  if(initial) set(initial);
+  el.addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return; set(b.dataset.v); cb(b.dataset.v);});
+  return ()=>el.querySelector('[aria-pressed="true"]').dataset.v;
+}
+const pref = k=>v=>{prefs[k]=v; store.set("prefs",prefs);};
+
+/* ---------- grid helpers ---------- */
+function drawGrid(el, g, hl){
+  el.innerHTML="";
+  for(let i=0;i<13;i++)for(let j=0;j<13;j++){
+    const d=document.createElement("div"); const a=g[i*13+j];
+    d.className="cell "+a+(hl&&hl[0]===i&&hl[1]===j?" hl":""); d.textContent=handName(i,j); d.dataset.i=i; d.dataset.j=j;
+    el.appendChild(d);
+  }
+}
+function borderCells(g){
+  const out=[];
+  for(let i=0;i<13;i++)for(let j=0;j<13;j++){
+    const a=g[i*13+j];
+    const nb=[[i-1,j],[i+1,j],[i,j-1],[i,j+1]].filter(([x,y])=>x>=0&&y>=0&&x<13&&y<13);
+    if(nb.some(([x,y])=>g[x*13+y]!==a)) out.push([i,j]);
+  }
+  return out;
+}
+function warmCells(g){
+  const b=borderCells(g), out=[];
+  for(let i=0;i<13;i++)for(let j=0;j<13;j++) if(b.some(([x,y])=>Math.abs(x-i)+Math.abs(y-j)<=2)) out.push([i,j]);
+  return out;
+}
+
+/* ---------- trainer ---------- */
+const SUITS=["♠","♥","♦","♣"];
+const getMode = segment("#mode", prefs.mode, v=>{ pref("mode")(v); $("#modehelp").textContent=MODEHELP[v]; });
+const getSpeed = segment("#speed", prefs.speed, pref("speed"));
+const getAfter = segment("#after", prefs.after, v=>{ pref("after")(v); });
+const getWhich = segment("#which", prefs.which, pref("which"));
+$("#modehelp").textContent=MODEHELP[prefs.mode];
+
+function dealCards(i,j){
+  if(i===j){ const s=[0,1,2,3].sort(()=>Math.random()-.5); return [[i,s[0]],[i,s[1]]]; }
+  const hi=Math.min(i,j), lo=Math.max(i,j);
+  if(i<j){ const s=rnd(4); return [[hi,s],[lo,s]]; }
+  const s1=rnd(4); let s2=rnd(3); if(s2>=s1) s2++; return [[hi,s1],[lo,s2]];
+}
+function pickHand(g, mode){
+  if(mode==="cold"){
+    const deck=[];for(let r=0;r<13;r++)for(let s=0;s<4;s++)deck.push([r,s]);
+    const a=deck.splice(rnd(52),1)[0], b=deck.splice(rnd(51),1)[0];
+    const hi=a[0]<=b[0]?a:b, lo=hi===a?b:a;
+    const cell = hi[0]===lo[0]? [hi[0],hi[0]] : hi[1]===lo[1]? [hi[0],lo[0]] : [lo[0],hi[0]];
+    return {cell, cards:[hi,lo]};
+  }
+  const pool = mode==="hot"?borderCells(g):warmCells(g);
+  const cell = pool.length? pick(pool) : [rnd(13),rnd(13)];
+  return {cell, cards:dealCards(cell[0],cell[1])};
+}
+const randTag = ()=>pick(["Rec","Rec","Rec","Agg","Pass"]);
+
+function buildStory(key){
+  const [, group, act, vill] = key.split("|");
+  const seats = GROUPS[group].filter(s=> s>=NEED[act] && !(act==="ThreeBet" && s===8));
+  const hero = pick(seats);
+  const tags = SEATS.map(()=>randTag());
+  const steps = [];
+  let villain=-1;
+  const before=[...Array(hero).keys()];
+  if(act==="Fold"){ before.forEach(s=>steps.push({s,a:"fold"})); for(let s=hero+1;s<9;s++) tags[s]=vill; }
+  if(act==="Limp"||act==="Open"){
+    villain=pick(before); tags[villain]=vill;
+    before.forEach(s=>steps.push(s===villain?{s,a:act==="Limp"?"limp":"raise",amt:act==="Limp"?2:10}:{s,a:"fold"}));
+  }
+  if(act==="OpenCC"){
+    villain=pick(before.slice(0,-1)); tags[villain]=vill;
+    const caller=villain+1+rnd(hero-villain-1);
+    before.forEach(s=>steps.push(s===villain?{s,a:"raise",amt:10}:s===caller?{s,a:"call",amt:10}:{s,a:"fold"}));
+  }
+  if(act==="ThreeBet"){
+    before.forEach(s=>steps.push({s,a:"fold"}));
+    steps.push({s:hero,a:"raise",amt:10,auto:true});
+    villain=hero+1+rnd(8-hero); tags[villain]=vill;
+    for(let s=hero+1;s<9;s++) steps.push(s===villain?{s,a:"raise",amt:35}:{s,a:"fold"});
+  }
+  return {key,act,group,hero,tags,steps,villain};
+}
+
+let cur=null, timers=[], countdown=null;
+const clearTimers=()=>{timers.forEach(clearTimeout); timers=[];};
+function seatXY(seat, hero, r=1){
+  const rel=(seat-hero+9)%9, ang=(90+rel*40)*Math.PI/180;
+  return [50+40*r*Math.cos(ang), 50+42*r*Math.sin(ang)];
+}
+function renderTable(state){
+  const t=$("#table");
+  t.querySelectorAll(".seat,.chip,.dealer").forEach(e=>e.remove());
+  const {story}=state;
+  SEATS.forEach((name,s)=>{
+    const [x,y]=seatXY(s,story.hero);
+    const d=document.createElement("div");
+    const isHero=s===story.hero;
+    d.className="seat"+(isHero?" hero":"")+(isHero&&state.intro?" intro":"")+(state.folded.has(s)?" folded":"")+(state.acting===s&&!isHero?" acting":"");
+    d.style.left=x+"%"; d.style.top=y+"%";
+    d.innerHTML= isHero? `<div class="pod"><div class="pos">You · ${name}</div></div>`
+      : `<div class="pod"><div class="pos">${name}</div><span class="tag ${story.tags[s]}">${story.tags[s]}</span></div>`;
+    t.appendChild(d);
+    const bet=state.bets[s];
+    if(bet){const [cx,cy]=seatXY(s,story.hero,.6);const c=document.createElement("div");
+      c.className="chip "+bet.kind; c.style.left=cx+"%"; c.style.top=cy+"%";
+      c.textContent= bet.kind==="blind"? "$"+bet.amt : (bet.kind==="limp"?"Limp $":bet.kind==="call"?"Call $":"Raise $")+bet.amt; t.appendChild(c);}
+    if(s===6){const [dx,dy]=seatXY(s,story.hero,.78);const b=document.createElement("div");b.className="dealer";b.style.left=(dx+(dx<50?7:-7))+"%";b.style.top=dy+"%";b.textContent="D";t.appendChild(b);}
+  });
+  const pot=Object.values(state.bets).reduce((a,b)=>a+b.amt,0);
+  $("#pot").textContent="Pot $"+pot;
+}
+
+function newHand(){
+  clearTimers(); stopCountdown();
+  const which=getWhich();
+  const keys=trainKeys().filter(k=>(which==="all"||ranges[k].src===which)&&(!prefs.only.length||prefs.only.includes(k)));
+  $("#feedback").hidden=true; $("#post").hidden=true; $("#answers").hidden=false; $("#post").className="post";
+  if(!keys.length){ $("#log").textContent="No ranges match your settings. Check Ranges and Situations in Settings."; return; }
+  let key, hand;
+  if(getMode()==="weak"){ const w=pickWeak(keys); key=w.key; hand={cell:w.cell, cards:dealCards(w.cell[0],w.cell[1])}; }
+  else { key=pick(keys); hand=pickHand(ranges[key].g, getMode()); }
+  const story=buildStory(key);
+  const state={story,hand,folded:new Set(),bets:{7:{amt:1,kind:"blind"},8:{amt:2,kind:"blind"}},acting:-1,intro:true,step:0,done:false};
+  cur=state;
+  const hd=$("#hand"); hd.innerHTML="";
+  hand.cards.forEach(([r,s])=>{const c=document.createElement("div");c.className="card"+(s===1||s===2?" red":"");c.innerHTML=`<span class="r">${RANKS[r]==="T"?"10":RANKS[r]}</span><span class="s">${SUITS[s]}</span>`;hd.appendChild(c);});
+  setAnswers("fold");
+  $("#log").textContent=`You're in the ${SEATS[story.hero]} (${story.group} ranges).`;
+  renderTable(state);
+  timers.push(setTimeout(()=>{ if(state!==cur) return; state.intro=false; play(); }, SPEEDS[getSpeed()][0]));
+}
+function applyStep(state){
+  const st=state.story.steps[state.step++]; const s=st.s;
+  if(st.a==="fold") state.folded.add(s); else state.bets[s]={amt:st.amt,kind:st.a};
+  const who = s===state.story.hero?"You":`${SEATS[s]} (${state.story.tags[s]})`;
+  $("#log").textContent = st.auto? "You raise to $10 (played for you)." : st.a==="fold"? `${who} folds.` : `${who} ${st.a==="limp"?"limps":st.a==="call"?"calls $"+st.amt:"raises to $"+st.amt}.`;
+  return st;
+}
+function finish(state){
+  state.done=true; state.acting=state.story.hero; state.intro=false;
+  $("#log").textContent="Action is on you.";
+  renderTable(state); setAnswers(true);
+}
+function play(){
+  const state=cur, big=SPEEDS[getSpeed()][1];
+  const tick=()=>{ if(state!==cur) return;
+    if(state.step>=state.story.steps.length){ finish(state); return; }
+    const nxt=state.story.steps[state.step];
+    state.acting=nxt.s; renderTable(state);
+    const st=applyStep(state); renderTable(state);
+    timers.push(setTimeout(tick, st.a==="fold"? big/3 : big)); };
+  tick();
+}
+$("#skip").onclick=()=>{ if(!cur||cur.done) return; clearTimers(); while(cur.step<cur.story.steps.length) applyStep(cur); finish(cur); };
+
+/* on: true = all buttons, "fold" = only Fold (before the action reaches you), false = none */
+function setAnswers(on){
+  const lab = cur? labels(cur.story.act, cur.story.group) : labels("Open");
+  $("#answers").querySelectorAll("button").forEach(b=>{b.disabled= on===true? false : on==="fold"? b.dataset.a!=="F" : true; b.textContent=lab[b.dataset.a];});
+}
+$("#answers").addEventListener("click",e=>{
+  const b=e.target.closest("button"); if(!b||b.disabled||!cur||cur.answered) return;
+  cur.answered=true;
+  const early=!cur.done;
+  if(early){ clearTimers(); while(cur.step<cur.story.steps.length) applyStep(cur); cur.done=true; cur.intro=false; cur.acting=cur.story.hero; renderTable(cur); $("#log").textContent="You folded early. The table shows how the action went."; }
+  const [i,j]=cur.hand.cell, entry=ranges[cur.story.key], correct=entry.g[i*13+j], ok=b.dataset.a===correct;
+  stats.total++; if(ok){stats.right++;stats.streak++;} else stats.streak=0;
+  log.push({id:newId(),t:Date.now(),k:cur.story.key,h:handName(i,j),a:b.dataset.a,c:correct,ok,mode:getMode(),early}); store.set("log",log); scheduleSync();
+  store.set("stats",stats);
+  setAnswers(false);
+  const lab=labels(cur.story.act, cur.story.group);
+  $("#verdict").textContent= ok? "Right" : "Not quite";
+  $("#verdict").className="verdict "+(ok?"ok":"no");
+  $("#explain").innerHTML=`<b>${handName(i,j)}</b> is a <b>${lab[correct]}</b> in <i>${keyLabel(cur.story.key)}</i> ${srcBadge(entry.src)}${ok?"":`<br>You picked ${lab[b.dataset.a]}.`}`;
+  drawGrid($("#minigrid"), entry.g, [i,j]);
+  $("#feedback").hidden=false; $("#toggle").textContent="Hide range";
+  $("#answers").hidden=true; $("#post").hidden=false; $("#post").className="post "+(ok?"ok":"no");
+  $("#feedback").className="feedback "+(ok?"ok":"no");
+  showScore();
+  const after=getAfter();
+  if(after==="always" || (after==="right" && ok)) startCountdown(4);
+});
+function startCountdown(n){
+  stopCountdown(); let left=n; const btn=$("#next");
+  btn.textContent=`Next in ${left}`; $("#stay").hidden=false; $("#post").classList.add("three");
+  countdown=setInterval(()=>{ left--; if(left<=0){ stopCountdown(); newHand(); } else btn.textContent=`Next in ${left}`; },1000);
+}
+function stopCountdown(){ if(countdown){clearInterval(countdown); countdown=null;} $("#next").textContent="Next hand"; $("#stay").hidden=true; $("#post").classList.remove("three"); }
+$("#stay").onclick=stopCountdown;
+$("#toggle").onclick=()=>{ const f=$("#feedback"); f.hidden=!f.hidden; $("#toggle").textContent=f.hidden?"Show range":"Hide range"; };
+$("#next").onclick=newHand;
+$("#editthis").onclick=()=>{ if(!cur) return; stopCountdown(); const [g,seat,act,v]=cur.story.key.split("|"); sGame.value=g; sSeat.value=seat; sAct.value=act; sVill.value=v; show("ranges"); window.scrollTo({top:0}); };
+function trainKeys(){ return Object.keys(ranges).filter(k=>k.startsWith("cash|")&&hasRange(ranges[k])); }
+function drawSitSum(){ const n=prefs.only.filter(k=>trainKeys().includes(k)).length; $("#sitsum").textContent = n? `${n} chosen` : "All situations"; }
+$("#sitbtn").onclick=()=>{
+  const box=$("#sitlist"); if(!box.hidden){ box.hidden=true; $("#sitbtn").textContent="Choose"; return; }
+  box.innerHTML=`<label><input type="checkbox" id="sit-all" ${prefs.only.length?"":"checked"}> <b>All situations</b></label>`;
+  trainKeys().sort().forEach((k,n)=>{ const l=document.createElement("label");
+    l.innerHTML=`<input type="checkbox" id="sit-${n}" data-k="${k}" ${prefs.only.includes(k)?"checked":""}> ${keyLabel(k).replace("Cash · ","")} ${srcBadge(ranges[k].src)}`; box.appendChild(l); });
+  box.onchange=e=>{
+    if(e.target.id==="sit-all"){ prefs.only=[]; box.querySelectorAll("[data-k]").forEach(c=>c.checked=false); e.target.checked=true; }
+    else { prefs.only=[...box.querySelectorAll("[data-k]:checked")].map(c=>c.dataset.k); $("#sit-all").checked=!prefs.only.length; }
+    store.set("prefs",prefs); drawSitSum(); };
+  box.hidden=false; $("#sitbtn").textContent="Done";
+};
+function showScore(){ $("#score").textContent=`${stats.right} / ${stats.total} right · streak ${stats.streak}`; }
+
+/* ---------- progress: hands are graded by the edge they sit next to ---------- */
+const RN={A:"aces",K:"kings",Q:"queens",J:"jacks",T:"tens","9":"nines","8":"eights","7":"sevens","6":"sixes","5":"fives","4":"fours","3":"threes","2":"twos"};
+const LINES=[{id:"P",name:"Pairs",cells:[...Array(13)].map((_,i)=>[i,i])}];
+for(let h=0;h<12;h++){
+  LINES.push({id:"S"+RANKS[h],name:"Suited "+RN[RANKS[h]],cells:[...Array(12-h)].map((_,n)=>[h,h+1+n])});
+  LINES.push({id:"O"+RANKS[h],name:"Offsuit "+RN[RANKS[h]],cells:[...Array(12-h)].map((_,n)=>[h+1+n,h])});
+}
+const CELL_LINE={}; LINES.forEach((L,l)=>L.cells.forEach(([i,j],p)=>CELL_LINE[i*13+j]={l,p}));
+function handToCell(h){ const a=RANKS.indexOf(h[0]), b=RANKS.indexOf(h[1]); if(h.length===2) return [a,a]; return h[2]==="s"?[a,b]:[b,a]; }
+const unitCache={};
+function unitsOf(key){
+  const g=ranges[key].g; if(unitCache[key]&&unitCache[key].g===g) return unitCache[key];
+  const [,seat,act]=key.split("|"), lab=labels(act,seat), byCell={}, units={};
+  LINES.forEach(L=>{
+    const acts=L.cells.map(([i,j])=>g[i*13+j]), edges=[];
+    for(let q=1;q<acts.length;q++) if(acts[q]!==acts[q-1]) edges.push(q);
+    L.cells.forEach(([i,j],q)=>{
+      let id,name,sides;
+      if(!edges.length){ id=L.id+"|all"; name=`${L.name}: all ${lab[acts[0]]}`; sides=null; }
+      else { const e=edges.reduce((best,x)=>{const d=q<x?x-1-q:q-x, bd=q<best?best-1-q:q-best; return d<bd?x:best;},edges[0]);
+        const A=L.cells[e-1], B=L.cells[e]; id=L.id+"|"+e; sides=[A,B];
+        name=`${L.name}: ${handName(...A)} ${lab[acts[e-1]]} | ${handName(...B)} ${lab[acts[e]]}`; }
+      byCell[i*13+j]=id; if(!units[id]) units[id]={id,name,sides,cells:[]}; units[id].cells.push([i,j]);
+    });
+  });
+  return unitCache[key]={g,byCell,units};
+}
+const RECENT_EDGE=10, RECENT_SIT=25, MIN_ANSWERS=3;
+function computeStats(){
+  const S={sit:{},unit:{},days:{},all:[]};
+  for(const e of log){
+    S.all.push(e.ok);
+    const d=new Date(e.t), dk=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+    (S.days[dk]=S.days[dk]||[]).push(e.ok);
+    if(!hasRange(ranges[e.k])) continue;
+    const [i,j]=handToCell(e.h), U=unitsOf(e.k), id=U.byCell[i*13+j], uid=e.k+"#"+id;
+    (S.sit[e.k]=S.sit[e.k]||[]).push(e.ok);
+    const since=(ranges[e.k].since||{})[id.split("|")[0]]||0;
+    if(e.t>since) (S.unit[uid]=S.unit[uid]||[]).push(e.ok);
+  }
+  return S;
+}
+const acc=(arr,n)=>{ const a=n?arr.slice(-n):arr; return a.length? {r:a.filter(Boolean).length, n:a.length, p:a.filter(Boolean).length/a.length} : null; };
+const heatClass=a=>!a?"h-none":a.p>=.9?"h-good":a.p>=.5?"h-mid":"h-bad";
+const pct=a=>a?Math.round(a.p*100)+"%":"–";
+function pickWeak(keys){
+  const S=computeStats(), cand=[];
+  for(const k of keys){ const U=unitsOf(k);
+    for(const u of Object.values(U.units)){ const a=acc(S.unit[k+"#"+u.id]||[],RECENT_EDGE);
+      const w = !a||a.n<3 ? 0.6 : (1-a.p)+0.08; cand.push({k,u,w}); } }
+  let x=Math.random()*cand.reduce((s,c)=>s+c.w,0), c=cand[0];
+  for(const y of cand){ x-=y.w; if(x<=0){ c=y; break; } }
+  const cell = c.u.sides? pick(c.u.sides) : pick(c.u.cells);
+  return {key:c.k, cell};
+}
+function drawProgress(){
+  const S=computeStats(), all=acc(S.all), rec=acc(S.all,50);
+  $("#kpis").innerHTML=`<div class="kpi"><div class="v">${S.all.length}</div><div class="k">hands answered</div></div>
+    <div class="kpi"><div class="v">${pct(rec)}</div><div class="k">recent (last 50)</div></div>
+    <div class="kpi"><div class="v">${pct(all)}</div><div class="k">all-time</div></div>`;
+  const dk=Object.keys(S.days).sort().slice(-14);
+  $("#days").innerHTML = dk.length? dk.map(k=>{const a=acc(S.days[k]); return `<div class="day" title="${k}: ${a.r} of ${a.n}"><div class="dl">${pct(a)}</div><div class="bar" style="height:${Math.max(4,a.p*70)}%"></div><div class="dl">${+k.slice(8)}/${+k.slice(5,7)}</div></div>`;}).join("")
+    : '<span class="note" style="align-self:center">Answer some hands to see your days here.</span>';
+  const keys=trainKeys().map(k=>({k,a:acc(S.sit[k]||[],RECENT_SIT),t:acc(S.sit[k]||[])}))
+    .sort((x,y)=>(x.a?x.a.p:2)-(y.a?y.a.p:2));
+  const box=$("#sits"); box.innerHTML="";
+  keys.forEach(({k,a,t})=>{
+    const d=document.createElement("details"); d.className="sit";
+    d.innerHTML=`<summary><span class="nm">${keyLabel(k).replace("Cash · ","")} ${srcBadge(ranges[k].src)}</span><span class="pill ${heatClass(a)}">${a?pct(a):"new"}</span></summary>`;
+    d.addEventListener("toggle",()=>{ if(!d.open||d.dataset.done) return; d.dataset.done=1;
+      const U=unitsOf(k), b=document.createElement("div"); b.className="body";
+      b.innerHTML=`<div class="note">Recent: ${a?`${a.r} of ${a.n}`:"none yet"} · All-time: ${t?`${t.r} of ${t.n} (${pct(t)})`:"none yet"}</div>`;
+      /* the real range, with the two squares on each side of an edge marked by how well you know that edge */
+      const grid=document.createElement("div"); grid.className="grid mini";
+      const mark={};
+      for(const u of Object.values(U.units)){ if(!u.sides) continue;
+        const a=acc(S.unit[k+"#"+u.id]||[],RECENT_EDGE), cls=!a||a.n<MIN_ANSWERS?"e-new":a.p>=.9?"e-good":a.p>=.5?"e-mid":"e-bad";
+        u.sides.forEach(([i,j])=>{ const prev=mark[i*13+j]; const rank={"e-bad":3,"e-mid":2,"e-new":1,"e-good":0};
+          if(!prev||rank[cls]>rank[prev]) mark[i*13+j]=cls; }); }
+      for(let i=0;i<13;i++)for(let j=0;j<13;j++){ const c=document.createElement("div");
+        c.className="cell "+U.g[i*13+j]+(mark[i*13+j]?" "+mark[i*13+j]:""); c.textContent=handName(i,j); grid.appendChild(c); }
+      b.appendChild(grid);
+      b.insertAdjacentHTML("beforeend",`<div class="legend"><span><i class="sw ekey e-bad"></i>shaky edge (under 50%)</span><span><i class="sw ekey e-mid"></i>getting there (50–89%)</span><span><i class="sw ekey"></i>solid (90%+), no marks</span><span><i class="sw ekey e-new"></i>fewer than 3 answers so far</span></div>`);
+      const tested=Object.values(U.units).map(u=>({u,a:acc(S.unit[k+"#"+u.id]||[],RECENT_EDGE)})).filter(x=>x.a&&x.u.sides).sort((x,y)=>x.a.p-y.a.p).slice(0,5);
+      b.insertAdjacentHTML("beforeend", tested.length? `<span class="lbl">Weakest edges (recent)</span><div class="edges">${tested.map(x=>`<div><span>${x.u.name}</span><b>${x.a.r} of ${x.a.n}</b></div>`).join("")}</div>` : `<div class="note">No edges tested yet.</div>`);
+      const row=document.createElement("div"); row.className="row";
+      row.innerHTML=`<button class="ghost">Practice this situation</button><button class="ghost">Weak spots here</button>`;
+      const go=(mode)=>{ prefs.only=[k]; store.set("prefs",prefs); drawSitSum(); if(mode){ prefs.mode=mode; store.set("prefs",prefs); $("#mode").querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed",x.dataset.v===mode)); $("#modehelp").textContent=MODEHELP[mode]; } show("train"); window.scrollTo({top:0}); newHand(); };
+      row.children[0].onclick=()=>go(null); row.children[1].onclick=()=>go("weak");
+      b.appendChild(row); d.appendChild(b);
+    });
+    box.appendChild(d);
+  });
+}
+
+/* ---------- range editor ---------- */
+const sSeat=$("#s-seat"), sAct=$("#s-action"), sVill=$("#s-vill"), sGame=$("#s-game");
+Object.keys(GROUPS).forEach(k=>sSeat.add(new Option(k,k)));
+Object.entries(ACTIONS).forEach(([k,v])=>sAct.add(new Option(v,k)));
+VILLS.forEach(k=>sVill.add(new Option("by "+k,k)));
+const getPaint = segment("#paint", "R", ()=>{});
+const undoStack=[];
+function edKey(){return `${sGame.value}|${sSeat.value}|${sAct.value}|${sVill.value}`}
+[sSeat,sAct,sVill,sGame].forEach(s=>s.onchange=drawEditor);
+function edEntry(){ const e=ranges[edKey()]; return e&&e.g? e : {g:"F".repeat(169),src:"custom"}; }
+function drawEditor(){
+  drawGrid($("#editgrid"), edEntry().g);
+  drawSrc(); drawPct(); drawLists(); $("#undo").disabled=!undoStack.length;
+}
+function drawSrc(){
+  const e=ranges[edKey()];
+  $("#srcrow").innerHTML = !e||!e.g? `<span class="note">No range yet. Paint one to make it Custom.</span>`
+    : e.src==="claude"? `${srcBadge("claude")}<span class="note">Made by Claude for testing. Painting any square makes it Custom.</span>`
+    : `${srcBadge("custom")}<span class="note">Your range.</span>`;
+}
+function drawPct(){
+  const g=edEntry().g; let t={R:0,C:0,F:0};
+  for(let i=0;i<13;i++)for(let j=0;j<13;j++) t[g[i*13+j]]+=combos(i,j);
+  const p=x=>(x/1326*100).toFixed(1)+"%";
+  const lab=labels(sAct.value, sSeat.value);
+  $("#pct").innerHTML=`<span><i class="sw" style="background:var(--raise)"></i>${lab.R} ${p(t.R)}</span><span><i class="sw" style="background:var(--call)"></i>${lab.C} ${p(t.C)}</span><span><i class="sw" style="background:var(--foldbg)"></i>Fold ${p(t.F)}</span>`;
+}
+function drawLists(){
+  const need=$("#need"), have=$("#have"); need.innerHTML=""; have.innerHTML=""; let n=0;
+  for(const seat of Object.keys(GROUPS)) for(const act of Object.keys(ACTIONS)) for(const v of VILLS){
+    if(!validKey(seat,act)) continue;
+    const k=`${sGame.value}|${seat}|${act}|${v}`, e=ranges[k], ok=hasRange(e);
+    const b=document.createElement("button"); b.className=ok?"has":"";
+    b.innerHTML=`${seat} · ${ACTIONS[act]} · ${v}${ok?" "+srcBadge(e.src):""}`;
+    b.onclick=()=>{sSeat.value=seat;sAct.value=act;sVill.value=v;drawEditor();window.scrollTo({top:0,behavior:"smooth"});};
+    (ok?have:need).appendChild(b); if(!ok) n++;
+  }
+  $("#needcount").textContent=`${n} situations in ${sGame.value==="cash"?"Cash":"Tournament"} have no range yet. They're never tested.`;
+  if(!have.children.length) have.innerHTML='<span class="note">None yet.</span>';
+}
+function pushUndo(key){ undoStack.push({key, prev: ranges[key]? clone(ranges[key]) : null}); if(undoStack.length>100) undoStack.shift(); $("#undo").disabled=false; }
+let painting=false, strokeSaved=false;
+function paintAt(el){
+  if(!el||!el.classList.contains("cell")) return;
+  const i=+el.dataset.i, j=+el.dataset.j, k=edKey(), a=getPaint();
+  const e=edEntry(); if(e.g[i*13+j]===a) return;
+  if(!strokeSaved){ pushUndo(k); strokeSaved=true; }
+  const g=e.g.split(""); g[i*13+j]=a;
+  /* editing a line starts its edges fresh: recent accuracy there ignores answers from before this moment */
+  ranges[k]={g:g.join(""),src:"custom",since:Object.assign({},e.since,{[LINES[CELL_LINE[i*13+j].l].id]:Date.now()})};
+  touch(k); el.className="cell "+a; save(); drawPct();
+}
+const eg=$("#editgrid");
+eg.addEventListener("pointerdown",e=>{painting=true; strokeSaved=false; paintAt(e.target.closest(".cell")); e.preventDefault();});
+window.addEventListener("pointermove",e=>{ if(!painting) return; paintAt(document.elementFromPoint(e.clientX,e.clientY)?.closest?.(".cell")); });
+window.addEventListener("pointerup",()=>{ if(painting){painting=false; drawSrc(); drawLists();} });
+$("#undo").onclick=()=>{
+  const u=undoStack.pop(); if(!u) return;
+  if(u.key==="*ALL*") replaceAll(u.prev); else { ranges[u.key]= u.prev? clone(u.prev) : {deleted:true}; touch(u.key); }
+  save();
+  if(u.key!=="*ALL*"){ const [g,seat,act,v]=u.key.split("|"); sGame.value=g; sSeat.value=seat; sAct.value=act; sVill.value=v; }
+  drawEditor();
+};
+$("#clear").onclick=()=>{ const k=edKey(); if(!hasRange(ranges[k])) return; pushUndo(k); ranges[k]={deleted:true}; touch(k); save(); drawEditor(); };
+let resetArmed=false;
+$("#reset").onclick=()=>{
+  const btn=$("#reset");
+  if(!resetArmed){resetArmed=true;btn.textContent="Tap again to replace every range with the starting set";setTimeout(()=>{resetArmed=false;btn.textContent="Reset all ranges to the starting set";},4000);return;}
+  undoStack.push({key:"*ALL*",prev:clone(ranges)});
+  replaceAll(clone(BASE)); save(); resetArmed=false; btn.textContent="Reset all ranges to the starting set"; drawEditor();
+};
+
+/* ---------- sync / backup ---------- */
+$("#copy").onclick=()=>{ const t=$("#exp");
+  if(navigator.clipboard) navigator.clipboard.writeText(t.value).then(()=>$("#copied").textContent="Copied.",()=>{t.select();$("#copied").textContent="Selected. Use Copy from the menu.";});
+  else { t.select(); $("#copied").textContent="Selected. Use Copy from the menu."; } };
+$("#load").onclick=()=>{
+  try{ const o=JSON.parse(decodeURIComponent(escape(atob($("#imp").value.trim())))); if(!o.ranges) throw 0;
+    undoStack.push({key:"*ALL*",prev:clone(ranges)});
+    replaceAll(o.v===2? o.ranges : Object.fromEntries(Object.entries(o.ranges).map(([k,g])=>[k,{g,src:"custom"}])));
+    save(); $("#loaded").textContent="Loaded "+Object.keys(ranges).length+" ranges."; }
+  catch(e){ $("#loaded").textContent="That code didn't load. Check that you pasted the whole thing."; }
+};
+
+/* ---------- Google Sheet sync ----------
+   Local storage is the source of truth on each device. Changed ranges and new answers wait in a
+   "to send" pile and go to the Sheet in one request, about 30 s after the last change, when the
+   app is hidden or closed, and when it opens. Each request also brings back what other devices sent. */
+let syncState = Object.assign({url:"",answerRow:0,last:0}, store.get("sync",{}));
+const dirty = new Set(store.get("dirtyRanges",[]));
+let syncing=false, syncTimer=null;
+function touch(k){ if(ranges[k]) ranges[k].u=Date.now(); dirty.add(k); store.set("dirtyRanges",[...dirty]); scheduleSync(); }
+function replaceAll(next){
+  const keys=new Set([...Object.keys(ranges),...Object.keys(next)]), out={};
+  for(const k of keys) out[k]= next[k]? clone(next[k]) : {deleted:true};
+  ranges=out; keys.forEach(touch);
+}
+function ago(ms){ const s=Math.round((Date.now()-ms)/1000); return s<60?"just now":s<3600?Math.round(s/60)+" min ago":s<86400?Math.round(s/3600)+" h ago":Math.round(s/86400)+" d ago"; }
+function setSyncStatus(msg){
+  const pending=dirty.size+log.filter(e=>!e.s).length;
+  $("#syncstatus").textContent = msg || (!syncState.url? "Not set up yet. Your data is only on this device."
+    : `Last synced ${syncState.last?ago(syncState.last):"never"}.${pending?` ${pending} change${pending>1?"s":""} waiting to send.`:" Everything is sent."}`);
+  $("#syncpill").textContent = !syncState.url? "Not synced" : msg? msg.split(".")[0] : syncState.last? "Synced "+ago(syncState.last) : "Not synced yet";
+}
+function scheduleSync(delay=30000){ if(!syncState.url) { setSyncStatus(); return; } clearTimeout(syncTimer); syncTimer=setTimeout(()=>sync(), delay); setSyncStatus(); }
+async function sync(opts={}){
+  if(!syncState.url || syncing) return;
+  if(!navigator.onLine){ setSyncStatus("Offline. Changes will send when you're back online."); return; }
+  clearTimeout(syncTimer); syncing=true; setSyncStatus("Syncing...");
+  const sendKeys=[...dirty], sendAns=log.filter(e=>!e.s), sentU=Object.fromEntries(sendKeys.map(k=>[k,ranges[k]&&ranges[k].u]));
+  const body=JSON.stringify({
+    ranges:Object.fromEntries(sendKeys.filter(k=>ranges[k]).map(k=>[k,ranges[k]])),
+    answers:sendAns.map(e=>({id:e.id,t:e.t,k:e.k,h:e.h,a:e.a,c:e.c,ok:!!e.ok,mode:e.mode||"",early:!!e.early})),
+    answerRow:syncState.answerRow });
+  try{
+    const res=await fetch(syncState.url,{method:"POST",body,keepalive:!!opts.keepalive && body.length<60000});
+    const data=await res.json();
+    if(!data.ok) throw new Error(data.error||"the Sheet refused the request");
+    sendKeys.forEach(k=>{ if(!ranges[k] || ranges[k].u===sentU[k]) dirty.delete(k); }); /* painted again mid-send: keep it for next time */
+    sendAns.forEach(e=>e.s=1);
+    let changed=false;
+    for(const [k,r] of Object.entries(data.ranges||{})){
+      if(dirty.has(k)) continue;
+      const l=ranges[k]; if(!l || (r.u||0)>(l.u||0)){ ranges[k]=r; changed=true; }
+    }
+    const have=new Set(log.map(e=>e.id)); let added=0;
+    for(const a of data.answers||[]) if(!have.has(a.id)){ log.push(Object.assign({},a,{s:1})); added++; }
+    if(added){ log.sort((x,y)=>x.t-y.t); changed=true; }
+    syncState.answerRow=data.answerRows||syncState.answerRow; syncState.last=Date.now();
+    save(); store.set("log",log); store.set("dirtyRanges",[...dirty]); store.set("sync",syncState);
+    setSyncStatus();
+    if(changed){ if(!views.ranges.hidden) drawEditor(); if(!views.progress.hidden) drawProgress(); drawSitSum(); }
+  }catch(err){
+    setSyncStatus(`Couldn't reach your Sheet (${err.message}). Will try again in a minute.`);
+    clearTimeout(syncTimer); syncTimer=setTimeout(()=>sync(),60000);
+  }finally{ syncing=false; }
+}
+$("#syncurl").value=syncState.url;
+$("#syncsave").onclick=()=>{
+  const v=$("#syncurl").value.trim();
+  if(v && !/^https:\/\/script\.google\.com\/.+\/exec$/.test(v)){ setSyncStatus("That doesn't look like a web app link. It should start with https://script.google.com/ and end with /exec."); return; }
+  syncState.url=v; syncState.answerRow=0; store.set("sync",syncState);
+  /* first sync with a new Sheet sends everything this device has */
+  Object.keys(ranges).forEach(k=>dirty.add(k)); log.forEach(e=>delete e.s); store.set("dirtyRanges",[...dirty]); store.set("log",log);
+  if(v) sync(); else setSyncStatus();
+};
+$("#syncnow").onclick=()=>sync();
+document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="hidden") sync({keepalive:true}); else sync(); });
+window.addEventListener("pagehide",()=>sync({keepalive:true}));
+window.addEventListener("online",()=>sync());
+setInterval(()=>{ if(!syncing) setSyncStatus(); },30000);
+if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(()=>{});
+
+sSeat.value="BTN"; sAct.value="Fold"; sVill.value="Rec";
+showScore(); drawSitSum(); setSyncStatus(); newHand(); sync();
+</script>
+</body>
+</html>
